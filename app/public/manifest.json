@@ -1,0 +1,21 @@
+{
+  "name": "SolDev Labs",
+  "short_name": "SolDev",
+  "description": "Interactive learning platform for Solana developers. Gamified courses, on-chain credentials, and community-driven education.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#9945FF",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "developer-tools"],
+  "lang": "en",
+  "dir": "ltr"
+}

@@ -1,6 +1,6 @@
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Code, Award, Flame, Users, BookOpen, Zap, Shield, Star, Mail, ChevronRight, Play, Terminal, Sparkles, TrendingUp, CheckCircle, Layers, Rocket, GraduationCap, Trophy, Target, GitBranch, Cpu, Wallet } from 'lucide-react';
+import { ArrowRight, Code, Award, Flame, Users, BookOpen, Zap, Shield, Star, Mail, ChevronRight, Play, Terminal, Sparkles, TrendingUp, CheckCircle, Layers, Rocket, GraduationCap, Trophy, Target, GitBranch, Cpu, Wallet, MousePointer } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { SEO } from '@/components/SEO';
 import { CourseCard } from '@/components/course/CourseCard';
@@ -10,7 +10,74 @@ import { MOCK_TESTIMONIALS, MOCK_LEARNING_PATHS } from '@/services/mock-data';
 import { useCourses } from '@/cms/useCMSContent';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+
+// ─── Typing words cycle ───
+const CYCLE_WORDS = ['Learn.', 'Code.', 'Build.', 'Ship.'];
+
+function useTypingCycle(words: string[], typingSpeed = 100, pauseMs = 1800, deleteSpeed = 60) {
+  const [display, setDisplay] = useState('');
+  const [wordIndex, setWordIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const word = words[wordIndex];
+    const timeout = setTimeout(() => {
+      if (!isDeleting) {
+        setDisplay(word.slice(0, display.length + 1));
+        if (display.length + 1 === word.length) {
+          setTimeout(() => setIsDeleting(true), pauseMs);
+        }
+      } else {
+        setDisplay(word.slice(0, display.length - 1));
+        if (display.length - 1 === 0) {
+          setIsDeleting(false);
+          setWordIndex((prev) => (prev + 1) % words.length);
+        }
+      }
+    }, isDeleting ? deleteSpeed : typingSpeed);
+    return () => clearTimeout(timeout);
+  }, [display, isDeleting, wordIndex, words, typingSpeed, pauseMs, deleteSpeed]);
+
+  return display;
+}
+
+// ─── Mouse glow tracker ───
+function useMouseGlow(ref: React.RefObject<HTMLElement | null>) {
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const springX = useSpring(mouseX, { stiffness: 150, damping: 20 });
+  const springY = useSpring(mouseY, { stiffness: 150, damping: 20 });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const handler = (e: MouseEvent) => {
+      const rect = el.getBoundingClientRect();
+      mouseX.set(e.clientX - rect.left);
+      mouseY.set(e.clientY - rect.top);
+    };
+    el.addEventListener('mousemove', handler);
+    return () => el.removeEventListener('mousemove', handler);
+  }, [ref, mouseX, mouseY]);
+
+  return { springX, springY };
+}
+
+// ─── 3D tilt hook ───
+function useTilt() {
+  const handleMouse = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    el.style.transform = `perspective(800px) rotateY(${x * 12}deg) rotateX(${-y * 12}deg) scale(1.03)`;
+  }, []);
+  const handleLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.currentTarget.style.transform = 'perspective(800px) rotateY(0deg) rotateX(0deg) scale(1)';
+  }, []);
+  return { onMouseMove: handleMouse, onMouseLeave: handleLeave };
+}
 
 const stats = [
   { key: 'stats.courses', value: 12, suffix: '+', icon: BookOpen },
@@ -72,6 +139,26 @@ const Index = () => {
   const heroY = useTransform(scrollYProgress, [0, 1], [0, 150]);
   const { data: dbCourses = [] } = useCourses();
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+  
+  // Typing effect
+  const typingText = useTypingCycle(CYCLE_WORDS);
+  
+  // Mouse glow
+  const { springX, springY } = useMouseGlow(heroRef);
+  
+  // 3D tilt for tech cards
+  const tilt = useTilt();
+
+  // Active how-it-works step on scroll
+  const [activeStep, setActiveStep] = useState(0);
+  const howItWorksRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress: howProgress } = useScroll({ target: howItWorksRef, offset: ['start 0.7', 'end 0.3'] });
+  
+  useEffect(() => {
+    return howProgress.on('change', (v) => {
+      setActiveStep(Math.min(3, Math.floor(v * 4)));
+    });
+  }, [howProgress]);
 
   return (
     <MainLayout>
@@ -90,6 +177,12 @@ const Index = () => {
 
       {/* ═══ HERO ═══ */}
       <section ref={heroRef} className="relative overflow-hidden min-h-[85vh] sm:min-h-[92vh] flex items-center">
+        {/* Mouse-following glow */}
+        <motion.div
+          className="absolute w-[500px] h-[500px] rounded-full bg-primary/8 blur-[180px] pointer-events-none hidden lg:block"
+          style={{ left: springX, top: springY, x: '-50%', y: '-50%' }}
+        />
+
         {/* Cinematic gradient mesh */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,hsl(var(--primary)/0.15),transparent_70%)]" />
@@ -106,6 +199,8 @@ const Index = () => {
           />
         </div>
 
+        {/* Animated grid dots */}
+        <div className="absolute inset-0 dot-grid opacity-[0.04] pointer-events-none" />
         <div className="absolute inset-0 line-pattern opacity-[0.03] pointer-events-none" />
 
         <motion.div style={{ y: heroY, opacity: heroOpacity }} className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 w-full">
@@ -126,13 +221,21 @@ const Index = () => {
                 </span>
               </motion.div>
 
+              {/* Typing hero headline */}
               <motion.h1
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.1 }}
                 className="font-display text-[2.75rem] sm:text-6xl lg:text-[5rem] font-bold tracking-[-0.03em] leading-[0.95] mb-6"
               >
-                <span className="text-foreground block">Learn.</span>
+                <span className="text-gradient block h-[1.1em] relative">
+                  {typingText}
+                  <motion.span
+                    animate={{ opacity: [1, 0] }}
+                    transition={{ duration: 0.5, repeat: Infinity, repeatType: 'reverse' }}
+                    className="inline-block w-[4px] h-[0.85em] bg-primary ml-1 align-middle rounded-sm"
+                  />
+                </span>
                 <span className="text-foreground block">Build.</span>
                 <span className="text-gradient block">Ship on Solana.</span>
               </motion.h1>
@@ -155,12 +258,12 @@ const Index = () => {
                 <Link to="/courses">
                   <Button size="lg" className="relative bg-solana-gradient text-background hover:opacity-90 px-8 gap-2.5 font-semibold text-sm h-12 rounded-xl overflow-hidden group shadow-lg shadow-primary/20">
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
-                    <span className="relative">{t('hero.cta_start')}</span> <ArrowRight className="w-4 h-4 relative" />
+                    <span className="relative">{t('hero.cta_start')}</span> <ArrowRight className="w-4 h-4 relative group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
                 <Link to="/courses">
-                  <Button variant="outline" size="lg" className="border-border/50 text-muted-foreground hover:text-foreground px-6 gap-2 font-medium text-sm h-12 rounded-xl bg-card/30 backdrop-blur-sm hover:bg-card/60">
-                    <Play className="w-4 h-4" /> {t('hero.watch_demo')}
+                  <Button variant="outline" size="lg" className="border-border/50 text-muted-foreground hover:text-foreground px-6 gap-2 font-medium text-sm h-12 rounded-xl bg-card/30 backdrop-blur-sm hover:bg-card/60 group">
+                    <Play className="w-4 h-4 group-hover:scale-110 transition-transform" /> {t('hero.watch_demo')}
                   </Button>
                 </Link>
               </motion.div>
@@ -168,23 +271,34 @@ const Index = () => {
               {/* Quick trust signals */}
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="flex flex-col gap-2 mb-10">
                 {[t('hero.trust_1'), t('hero.trust_2'), t('hero.trust_3')].map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground/70">
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.6 + i * 0.1 }}
+                    className="flex items-center gap-2 text-xs text-muted-foreground/70"
+                  >
                     <CheckCircle className="w-3.5 h-3.5 text-accent shrink-0" />
                     <span>{item}</span>
-                  </div>
+                  </motion.div>
                 ))}
               </motion.div>
 
-              {/* Stats */}
+              {/* Stats with staggered count-up */}
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7, delay: 0.6 }} className="flex flex-wrap gap-8 sm:gap-10">
                 {stats.map((stat, i) => (
-                  <div key={stat.key} className="relative">
+                  <motion.div
+                    key={stat.key}
+                    className="relative group cursor-default"
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ type: 'spring', stiffness: 400 }}
+                  >
                     {i > 0 && <div className="absolute -left-4 sm:-left-5 top-1/2 -translate-y-1/2 w-px h-8 bg-border/40 hidden sm:block" />}
-                    <div className="text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
+                    <div className="text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight group-hover:text-gradient transition-all">
                       <AnimatedCounter value={stat.value} suffix={stat.suffix} format={stat.format || 'number'} duration={2} />
                     </div>
                     <div className="text-[11px] text-muted-foreground/60 mt-0.5 uppercase tracking-wider font-medium">{t(stat.key)}</div>
-                  </div>
+                  </motion.div>
                 ))}
               </motion.div>
             </div>
@@ -198,7 +312,7 @@ const Index = () => {
             >
               <div className="absolute -inset-10 bg-primary/5 rounded-[40px] blur-3xl" />
               
-              <div className="relative rounded-2xl overflow-hidden border border-border/40 bg-card shadow-2xl shadow-primary/5">
+              <div className="relative rounded-2xl overflow-hidden border border-border/40 bg-card shadow-2xl shadow-primary/5 hover:shadow-primary/15 transition-shadow duration-700">
                 <div className="absolute top-0 left-0 right-0 h-px overflow-hidden">
                   <motion.div
                     animate={{ x: ['-100%', '200%'] }}
@@ -209,9 +323,9 @@ const Index = () => {
 
                 <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-secondary/30">
                   <div className="flex gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-destructive/50" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-accent/30" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-accent/50" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-destructive/50 hover:bg-destructive transition-colors cursor-pointer" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-accent/30 hover:bg-accent/60 transition-colors cursor-pointer" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-accent/50 hover:bg-accent transition-colors cursor-pointer" />
                   </div>
                   <div className="ml-3 flex gap-0.5">
                     <div className="px-3 py-1 rounded-md bg-card/80 text-[10px] text-foreground font-mono font-medium border border-border/30">counter.rs</div>
@@ -248,55 +362,56 @@ const Index = () => {
 
               {/* Floating elements */}
               <motion.div animate={{ y: [0, -10, 0] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }} className="absolute -bottom-5 -left-8 z-10">
-                <div className="p-3 rounded-xl bg-card border border-border/40 flex items-center gap-3 shadow-xl shadow-background/50 backdrop-blur-sm">
+                <motion.div whileHover={{ scale: 1.08, rotate: -2 }} className="p-3 rounded-xl bg-card border border-border/40 flex items-center gap-3 shadow-xl shadow-background/50 backdrop-blur-sm cursor-default">
                   <div className="w-9 h-9 rounded-lg bg-destructive/10 flex items-center justify-center text-base">🔥</div>
                   <div>
                     <p className="text-xs font-bold text-foreground">12-Day Streak</p>
                     <p className="text-[10px] text-muted-foreground">Keep it going</p>
                   </div>
-                </div>
+                </motion.div>
               </motion.div>
 
               <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }} className="absolute -top-3 -right-5 z-10">
-                <div className="p-2.5 rounded-xl bg-card border border-border/40 flex items-center gap-2 shadow-xl shadow-background/50 backdrop-blur-sm">
+                <motion.div whileHover={{ scale: 1.08, rotate: 2 }} className="p-2.5 rounded-xl bg-card border border-border/40 flex items-center gap-2 shadow-xl shadow-background/50 backdrop-blur-sm cursor-default">
                   <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center">
                     <TrendingUp className="w-3.5 h-3.5 text-accent" />
                   </div>
                   <span className="text-xs font-mono font-bold text-foreground">2,450 XP</span>
-                </div>
+                </motion.div>
               </motion.div>
             </motion.div>
           </div>
         </motion.div>
       </section>
 
-      {/* ═══ PARTNERS ═══ */}
-      <section className="border-y border-border/20 bg-card/10">
+      {/* ═══ PARTNERS — Infinite Marquee ═══ */}
+      <section className="border-y border-border/20 bg-card/10 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-          <div className="flex items-center gap-8 sm:gap-12 overflow-hidden">
+          <div className="flex items-center gap-8 sm:gap-12">
             <span className="text-[10px] text-muted-foreground/70 uppercase tracking-[0.25em] font-semibold whitespace-nowrap shrink-0">{t('landing.ecosystem')}</span>
             <div className="w-px h-4 bg-border/40 shrink-0" />
-            <div className="flex items-center gap-8 sm:gap-12 overflow-x-auto scrollbar-none">
-              {partnerLogos.map((partner, i) => (
-                <motion.div
-                  key={partner.name}
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.05 }}
-                  className="flex items-center gap-2 text-muted-foreground/60 hover:text-foreground transition-colors duration-300 whitespace-nowrap shrink-0"
-                >
-                  <span className="text-lg">{partner.icon}</span>
-                  <span className="text-xs font-medium">{partner.name}</span>
-                </motion.div>
-              ))}
+            <div className="flex-1 overflow-hidden relative">
+              {/* Fade edges */}
+              <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+              <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+              <div className="marquee-track">
+                {[...partnerLogos, ...partnerLogos].map((partner, i) => (
+                  <div
+                    key={`${partner.name}-${i}`}
+                    className="flex items-center gap-2 text-muted-foreground/60 hover:text-foreground transition-colors duration-300 whitespace-nowrap shrink-0 mx-6 sm:mx-8"
+                  >
+                    <span className="text-lg">{partner.icon}</span>
+                    <span className="text-xs font-medium">{partner.name}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ═══ HOW IT WORKS ═══ */}
-      <section className="py-20 sm:py-28 relative overflow-hidden">
+      {/* ═══ HOW IT WORKS — Interactive Steps ═══ */}
+      <section ref={howItWorksRef} className="py-20 sm:py-28 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,hsl(var(--primary)/0.06),transparent_70%)]" />
         </div>
@@ -309,31 +424,56 @@ const Index = () => {
             <p className="text-muted-foreground text-sm max-w-lg mx-auto">{t('how.desc')}</p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {howItWorksData(t).map((item, i) => (
+          {/* Progress bar */}
+          <div className="hidden lg:block max-w-3xl mx-auto mb-10">
+            <div className="h-1 rounded-full bg-border/30 relative overflow-hidden">
               <motion.div
-                key={item.step}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.12 }}
-                className="relative group"
-              >
-                {/* Connector line */}
-                {i < 3 && <div className="hidden lg:block absolute top-10 left-[calc(100%+0.5rem)] w-[calc(100%-1rem)] h-px bg-gradient-to-r from-border/40 to-border/10 z-0" />}
-                
-                <div className="relative p-6 rounded-2xl bg-card/60 border border-border/30 transition-all duration-500 group-hover:border-primary/20 group-hover:bg-card/90 h-full">
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="text-[2rem] font-display font-black text-primary/15 leading-none">{item.step}</span>
-                    <div className={`w-10 h-10 rounded-xl bg-card border border-border/40 flex items-center justify-center transition-all group-hover:scale-110 group-hover:shadow-lg group-hover:border-primary/30`}>
-                      <item.icon className={`w-5 h-5 ${item.color}`} />
+                className="h-full rounded-full bg-solana-gradient"
+                style={{ width: `${((activeStep + 1) / 4) * 100}%` }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+              />
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {howItWorksData(t).map((item, i) => {
+              const isActive = i <= activeStep;
+              return (
+                <motion.div
+                  key={item.step}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.12 }}
+                  whileHover={{ y: -5, scale: 1.02 }}
+                  className="relative group cursor-default"
+                >
+                  {/* Connector line */}
+                  {i < 3 && <div className="hidden lg:block absolute top-10 left-[calc(100%+0.5rem)] w-[calc(100%-1rem)] h-px bg-gradient-to-r from-border/40 to-border/10 z-0" />}
+                  
+                  <div className={`relative p-6 rounded-2xl border transition-all duration-500 h-full ${
+                    isActive 
+                      ? 'bg-card/90 border-primary/30 shadow-lg shadow-primary/5' 
+                      : 'bg-card/60 border-border/30 group-hover:border-primary/20 group-hover:bg-card/90'
+                  }`}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className={`text-[2rem] font-display font-black leading-none transition-colors duration-500 ${isActive ? 'text-primary/40' : 'text-primary/15'}`}>{item.step}</span>
+                      <motion.div
+                        animate={isActive ? { scale: [1, 1.15, 1] } : {}}
+                        transition={{ duration: 0.5 }}
+                        className={`w-10 h-10 rounded-xl bg-card border flex items-center justify-center transition-all ${
+                          isActive ? 'border-primary/40 shadow-lg shadow-primary/20 scale-110' : 'border-border/40 group-hover:scale-110 group-hover:shadow-lg group-hover:border-primary/30'
+                        }`}
+                      >
+                        <item.icon className={`w-5 h-5 ${item.color}`} />
+                      </motion.div>
                     </div>
+                    <h3 className="font-display font-semibold text-foreground mb-2 text-sm">{item.title}</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
                   </div>
-                  <h3 className="font-display font-semibold text-foreground mb-2 text-sm">{item.title}</h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -371,25 +511,31 @@ const Index = () => {
                 <div className="relative p-5 sm:p-6 pb-0">
                   <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center transition-all group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-primary/25 group-hover:bg-primary/20">
+                      <motion.div
+                        whileHover={{ rotate: 12, scale: 1.15 }}
+                        className="w-11 h-11 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center transition-all group-hover:shadow-lg group-hover:shadow-primary/25 group-hover:bg-primary/20"
+                      >
                         <Terminal className="w-5 h-5 text-primary" />
-                      </div>
+                      </motion.div>
                       <div>
                         <h3 className="font-display font-bold text-foreground text-base">{t('features.interactive')}</h3>
                         <p className="text-xs text-muted-foreground">{t('features.interactive_desc')}</p>
                       </div>
                     </div>
                     <div className="hidden sm:flex items-center gap-2">
-                      <span className="px-3 py-1.5 rounded-lg bg-accent/15 border border-accent/25 text-accent text-[10px] font-mono font-bold flex items-center gap-1.5 shadow-sm shadow-accent/10">
+                      <motion.span
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="px-3 py-1.5 rounded-lg bg-accent/15 border border-accent/25 text-accent text-[10px] font-mono font-bold flex items-center gap-1.5 shadow-sm shadow-accent/10 cursor-pointer"
+                      >
                         <Play className="w-3 h-3" /> Run
-                      </span>
+                      </motion.span>
                     </div>
                   </div>
                 </div>
 
-                {/* Code editor mock — full immersive */}
+                {/* Code editor mock */}
                 <div className="relative mx-5 sm:mx-6 mb-5 sm:mb-6 rounded-xl overflow-hidden border border-border/50 bg-[hsl(228,22%,4%)] shadow-inner">
-                  {/* Animated scan line */}
                   <div className="absolute inset-0 overflow-hidden pointer-events-none z-10">
                     <motion.div
                       animate={{ y: ['-100%', '200%'] }}
@@ -398,7 +544,6 @@ const Index = () => {
                     />
                   </div>
 
-                  {/* Editor tabs */}
                   <div className="flex items-center px-3 py-2 border-b border-border/30 bg-[hsl(228,18%,7%)]">
                     <div className="flex gap-1.5 mr-4">
                       <div className="w-2.5 h-2.5 rounded-full bg-destructive/60" />
@@ -415,18 +560,13 @@ const Index = () => {
                     </div>
                   </div>
 
-                  {/* Code with sidebar */}
                   <div className="flex">
-                    {/* Line numbers gutter */}
                     <div className="px-3 py-3 text-right select-none border-r border-border/20 bg-[hsl(228,18%,5%)]">
                       {Array.from({length: 15}, (_, i) => (
                         <div key={i} className={`text-[11px] font-mono leading-[1.65] ${i >= 4 && i <= 8 ? 'text-muted-foreground/50' : 'text-muted-foreground/20'}`}>{i + 1}</div>
                       ))}
                     </div>
-                    
-                    {/* Code content */}
                     <div className="flex-1 py-3 px-4 overflow-hidden relative">
-                      {/* Active line highlight */}
                       <div className="absolute left-0 right-0 top-[calc(0.75rem+1.65em*4)] h-[1.65em] bg-primary/[0.04] pointer-events-none" />
                       <pre className="text-[11px] font-mono leading-[1.65]">
                         <code>
@@ -448,7 +588,6 @@ const Index = () => {
                           {'}'}
                         </code>
                       </pre>
-                      {/* Blinking cursor */}
                       <motion.span
                         animate={{ opacity: [1, 0] }}
                         transition={{ duration: 0.8, repeat: Infinity, repeatType: 'reverse' }}
@@ -457,7 +596,6 @@ const Index = () => {
                     </div>
                   </div>
 
-                  {/* Terminal output bar */}
                   <div className="border-t border-border/30 bg-[hsl(228,18%,6%)]">
                     <div className="px-3 py-1.5 border-b border-border/20 flex items-center gap-2">
                       <span className="text-[9px] font-mono text-muted-foreground/50 uppercase tracking-wider flex items-center gap-1.5">
@@ -495,6 +633,7 @@ const Index = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.08 }}
+              whileHover={{ y: -4 }}
               className="relative group"
             >
               <div className="relative p-6 rounded-2xl bg-card border border-border/40 h-full transition-all duration-500 group-hover:border-accent/40 group-hover:shadow-2xl group-hover:shadow-accent/10 overflow-hidden flex flex-col">
@@ -502,20 +641,18 @@ const Index = () => {
                 <div className="absolute inset-0 bg-gradient-to-br from-accent/[0.05] via-transparent to-primary/[0.04]" />
                 
                 <div className="relative mb-5">
-                  <div className="w-11 h-11 rounded-xl bg-accent/15 border border-accent/25 flex items-center justify-center mb-4 transition-all group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-accent/25 group-hover:bg-accent/20">
+                  <motion.div whileHover={{ rotate: -8, scale: 1.15 }} className="w-11 h-11 rounded-xl bg-accent/15 border border-accent/25 flex items-center justify-center mb-4 transition-all group-hover:shadow-lg group-hover:shadow-accent/25 group-hover:bg-accent/20">
                     <Award className="w-5 h-5 text-accent" />
-                  </div>
+                  </motion.div>
                   <h3 className="font-display font-bold text-foreground mb-1.5 text-base">{t('features.credentials')}</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">{t('features.credentials_desc')}</p>
                 </div>
 
-                {/* Stacked credential cards */}
                 <div className="relative mt-auto">
-                  {/* Background shadow card */}
                   <div className="absolute -top-2 left-3 right-3 h-full rounded-xl border border-accent/10 bg-accent/[0.03] -z-20" />
                   <div className="absolute -top-1 left-1.5 right-1.5 h-full rounded-xl border border-accent/15 bg-accent/[0.02] -z-10" />
                   
-                  <div className="p-4 rounded-xl border border-accent/25 bg-gradient-to-br from-accent/[0.08] to-primary/[0.06] shadow-lg shadow-accent/5">
+                  <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl border border-accent/25 bg-gradient-to-br from-accent/[0.08] to-primary/[0.06] shadow-lg shadow-accent/5">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-lg bg-solana-gradient flex items-center justify-center shrink-0 shadow-lg shadow-primary/25">
                         <GraduationCap className="w-5 h-5 text-background" />
@@ -536,7 +673,7 @@ const Index = () => {
                       </div>
                       <span className="text-[10px] text-muted-foreground ml-auto font-mono font-medium">Level 5</span>
                     </div>
-                  </div>
+                  </motion.div>
                 </div>
               </div>
             </motion.div>
@@ -547,6 +684,7 @@ const Index = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.12 }}
+              whileHover={{ y: -4 }}
               className="relative group"
             >
               <div className="relative p-6 rounded-2xl bg-card border border-border/40 h-full transition-all duration-500 group-hover:border-primary/40 group-hover:shadow-2xl group-hover:shadow-primary/10 overflow-hidden flex flex-col">
@@ -554,16 +692,14 @@ const Index = () => {
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.05] via-transparent to-destructive/[0.04]" />
                 
                 <div className="relative mb-5">
-                  <div className="w-11 h-11 rounded-xl bg-destructive/15 border border-destructive/25 flex items-center justify-center mb-4 transition-all group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-destructive/25 group-hover:bg-destructive/20">
+                  <motion.div whileHover={{ rotate: 12, scale: 1.15 }} className="w-11 h-11 rounded-xl bg-destructive/15 border border-destructive/25 flex items-center justify-center mb-4 transition-all group-hover:shadow-lg group-hover:shadow-destructive/25 group-hover:bg-destructive/20">
                     <Flame className="w-5 h-5 text-destructive" />
-                  </div>
+                  </motion.div>
                   <h3 className="font-display font-bold text-foreground mb-1.5 text-base">{t('features.gamification')}</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">{t('features.gamification_desc')}</p>
                 </div>
 
-                {/* Gamification preview */}
                 <div className="relative mt-auto space-y-3">
-                  {/* XP Bar */}
                   <div className="p-3 rounded-lg bg-secondary/30 border border-border/20">
                     <div className="flex items-center justify-between text-[10px] mb-2">
                       <span className="text-foreground font-bold flex items-center gap-1.5">
@@ -586,7 +722,6 @@ const Index = () => {
                     </div>
                   </div>
 
-                  {/* Achievement badges */}
                   <div className="flex items-center gap-1.5">
                     {[
                       { emoji: '🔥', label: '12 streak', bg: 'bg-destructive/10 border-destructive/20' },
@@ -594,14 +729,18 @@ const Index = () => {
                       { emoji: '🏆', label: 'Top 10', bg: 'bg-primary/10 border-primary/20' },
                       { emoji: '💎', label: 'Perfect', bg: 'bg-accent/10 border-accent/20' },
                     ].map((badge, j) => (
-                      <div key={j} className={`flex-1 py-2 rounded-lg ${badge.bg} border flex flex-col items-center gap-0.5 transition-all hover:scale-105`}>
+                      <motion.div
+                        key={j}
+                        whileHover={{ scale: 1.12, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={`flex-1 py-2 rounded-lg ${badge.bg} border flex flex-col items-center gap-0.5 cursor-default`}
+                      >
                         <span className="text-sm">{badge.emoji}</span>
                         <span className="text-[7px] text-muted-foreground font-medium">{badge.label}</span>
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
 
-                  {/* Daily streak */}
                   <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-destructive/[0.08] border border-destructive/20">
                     <div className="text-lg">🔥</div>
                     <div className="flex-1 min-w-0">
@@ -610,7 +749,14 @@ const Index = () => {
                     </div>
                     <div className="flex gap-0.5">
                       {[...Array(7)].map((_, d) => (
-                        <div key={d} className={`w-2 h-3.5 rounded-sm ${d < 5 ? 'bg-accent shadow-sm shadow-accent/30' : 'bg-secondary/60'}`} />
+                        <motion.div
+                          key={d}
+                          initial={{ height: 0 }}
+                          whileInView={{ height: 14 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: 0.8 + d * 0.08 }}
+                          className={`w-2 rounded-sm ${d < 5 ? 'bg-accent shadow-sm shadow-accent/30' : 'bg-secondary/60'}`}
+                        />
                       ))}
                     </div>
                   </div>
@@ -632,16 +778,15 @@ const Index = () => {
                 
                 <div className="relative flex flex-col sm:flex-row sm:items-center gap-5">
                   <div className="flex items-center gap-3 flex-1">
-                    <div className="w-11 h-11 rounded-xl bg-accent/15 border border-accent/25 flex items-center justify-center shrink-0 transition-all group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-accent/25 group-hover:bg-accent/20">
+                    <motion.div whileHover={{ rotate: -8, scale: 1.15 }} className="w-11 h-11 rounded-xl bg-accent/15 border border-accent/25 flex items-center justify-center shrink-0 transition-all group-hover:shadow-lg group-hover:shadow-accent/25 group-hover:bg-accent/20">
                       <Users className="w-5 h-5 text-accent" />
-                    </div>
+                    </motion.div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-display font-bold text-foreground mb-1 text-base">{t('features.community')}</h3>
                       <p className="text-xs text-muted-foreground leading-relaxed">{t('features.community_desc')}</p>
                     </div>
                   </div>
 
-                  {/* Community stats */}
                   <div className="flex items-center gap-6 shrink-0">
                     <div className="flex -space-x-2.5">
                       {['A', 'M', 'K', 'S', 'R', 'J'].map((letter, j) => (
@@ -651,7 +796,8 @@ const Index = () => {
                           whileInView={{ opacity: 1, scale: 1 }}
                           viewport={{ once: true }}
                           transition={{ delay: 0.3 + j * 0.05 }}
-                          className="w-9 h-9 rounded-full bg-solana-gradient flex items-center justify-center text-background text-[10px] font-bold border-2 border-card shadow-md"
+                          whileHover={{ y: -4, zIndex: 10 }}
+                          className="w-9 h-9 rounded-full bg-solana-gradient flex items-center justify-center text-background text-[10px] font-bold border-2 border-card shadow-md cursor-default"
                         >
                           {letter}
                         </motion.div>
@@ -675,7 +821,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ═══ WHAT YOU'LL LEARN — Tech Stack ═══ */}
+      {/* ═══ WHAT YOU'LL LEARN — Tech Stack with 3D Tilt ═══ */}
       <section className="py-20 sm:py-28 relative overflow-hidden border-y border-border/10">
         <div className="absolute inset-0 bg-gradient-to-b from-card/30 via-transparent to-card/30" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -697,10 +843,20 @@ const Index = () => {
                 transition={{ delay: i * 0.06 }}
                 className="group"
               >
-                <div className="relative p-5 rounded-2xl bg-card/60 border border-border/30 text-center transition-all duration-500 group-hover:border-primary/25 group-hover:bg-card/90 group-hover:-translate-y-1">
-                  <div className="w-12 h-12 rounded-xl bg-primary/5 border border-border/30 flex items-center justify-center mx-auto mb-3 transition-all group-hover:bg-primary/10 group-hover:scale-110">
+                <div
+                  onMouseMove={tilt.onMouseMove}
+                  onMouseLeave={tilt.onMouseLeave}
+                  className="relative p-5 rounded-2xl bg-card/60 border border-border/30 text-center transition-all duration-300 group-hover:border-primary/25 group-hover:bg-card/90 group-hover:shadow-xl group-hover:shadow-primary/10 will-change-transform"
+                  style={{ transformStyle: 'preserve-3d' }}
+                >
+                  {/* Glow on hover */}
+                  <div className="absolute inset-0 rounded-2xl bg-primary/5 opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500 -z-10" />
+                  <motion.div
+                    whileHover={{ scale: 1.2, rotate: 8 }}
+                    className="w-12 h-12 rounded-xl bg-primary/5 border border-border/30 flex items-center justify-center mx-auto mb-3 transition-colors group-hover:bg-primary/10"
+                  >
                     <tech.icon className="w-5 h-5 text-primary" />
-                  </div>
+                  </motion.div>
                   <h3 className="font-display font-bold text-foreground text-sm mb-0.5">{tech.name}</h3>
                   <p className="text-[10px] text-muted-foreground">{tech.desc}</p>
                 </div>
@@ -735,12 +891,13 @@ const Index = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
+                whileHover={{ y: -6, scale: 1.02 }}
                 className="group"
               >
                 <Link to="/courses" className="block h-full">
-                  <div className="rounded-2xl bg-card/60 border border-border/30 overflow-hidden p-6 sm:p-7 h-full transition-all duration-500 group-hover:border-primary/20 group-hover:bg-card/90 relative">
+                  <div className="rounded-2xl bg-card/60 border border-border/30 overflow-hidden p-6 sm:p-7 h-full transition-all duration-500 group-hover:border-primary/20 group-hover:bg-card/90 group-hover:shadow-xl group-hover:shadow-primary/5 relative">
                     <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${path.color} opacity-40 group-hover:opacity-80 transition-opacity`} />
-                    <div className="text-3xl mb-5">{path.icon}</div>
+                    <motion.div whileHover={{ scale: 1.15, rotate: -5 }} className="text-3xl mb-5 inline-block">{path.icon}</motion.div>
                     <h3 className="font-display font-bold text-foreground mb-2.5 text-base group-hover:text-primary transition-colors">{path.name}</h3>
                     <p className="text-sm text-muted-foreground mb-5 leading-relaxed line-clamp-2">{path.description}</p>
                     <div className="flex items-center gap-1.5 text-xs text-primary font-semibold">
@@ -799,20 +956,23 @@ const Index = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
+                whileHover={{ y: -5, scale: 1.02 }}
                 className="group"
               >
-                <div className="relative p-6 sm:p-7 rounded-2xl bg-card/60 border border-border/30 transition-all duration-500 group-hover:border-primary/15 group-hover:bg-card/80 h-full overflow-hidden">
-                  <div className="absolute top-0 left-6 w-8 h-0.5 bg-solana-gradient opacity-40" />
+                <div className="relative p-6 sm:p-7 rounded-2xl bg-card/60 border border-border/30 transition-all duration-500 group-hover:border-primary/15 group-hover:bg-card/80 group-hover:shadow-xl group-hover:shadow-primary/5 h-full overflow-hidden">
+                  <div className="absolute top-0 left-6 w-8 h-0.5 bg-solana-gradient opacity-40 group-hover:w-16 transition-all duration-500" />
                   <div className="flex gap-0.5 mb-5 mt-2">
                     {Array.from({ length: 5 }).map((_, j) => (
-                      <Star key={j} className="w-3 h-3 text-accent fill-accent" />
+                      <motion.div key={j} initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ delay: 0.3 + j * 0.05, type: 'spring' }}>
+                        <Star className="w-3 h-3 text-accent fill-accent" />
+                      </motion.div>
                     ))}
                   </div>
                   <p className="text-sm text-muted-foreground mb-6 leading-relaxed italic">"{testimonial.quote}"</p>
                   <div className="flex items-center gap-3 mt-auto">
-                    <div className="w-8 h-8 rounded-full bg-solana-gradient flex items-center justify-center text-background font-bold text-[11px] shrink-0">
+                    <motion.div whileHover={{ scale: 1.1 }} className="w-8 h-8 rounded-full bg-solana-gradient flex items-center justify-center text-background font-bold text-[11px] shrink-0">
                       {testimonial.avatar}
-                    </div>
+                    </motion.div>
                     <div>
                       <p className="text-sm font-semibold text-foreground">{testimonial.name}</p>
                       <p className="text-[11px] text-muted-foreground">{testimonial.role}</p>
@@ -828,18 +988,43 @@ const Index = () => {
       {/* ═══ CTA ═══ */}
       <section className="py-20 sm:py-28">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative rounded-[2rem] overflow-hidden">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="relative rounded-[2rem] overflow-hidden"
+          >
             <div className="absolute inset-0 bg-card" />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_0%,hsl(var(--primary)/0.08),transparent_60%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_60%_at_100%_100%,hsl(var(--accent)/0.06),transparent_50%)]" />
             <div className="absolute inset-0 line-pattern opacity-[0.03]" />
             <div className="absolute inset-0 rounded-[2rem] border border-border/30" />
 
+            {/* Floating particles in CTA */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              {[...Array(6)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  animate={{
+                    y: [0, -30, 0],
+                    x: [0, (i % 2 === 0 ? 15 : -15), 0],
+                    opacity: [0.2, 0.6, 0.2],
+                  }}
+                  transition={{ duration: 4 + i, repeat: Infinity, ease: 'easeInOut', delay: i * 0.7 }}
+                  className="absolute w-1.5 h-1.5 rounded-full bg-primary/30"
+                  style={{ left: `${15 + i * 14}%`, top: `${20 + (i % 3) * 25}%` }}
+                />
+              ))}
+            </div>
+
             <div className="relative text-center py-20 sm:py-24 px-6 sm:px-12">
               <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border/30 bg-secondary/30 text-[11px] text-muted-foreground font-medium mb-8">
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border/30 bg-secondary/30 text-[11px] text-muted-foreground font-medium mb-8 cursor-default"
+                >
                   <Sparkles className="w-3 h-3 text-primary" /> {t('landing.cta_free')}
-                </div>
+                </motion.div>
                 <h2 className="font-display text-3xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-5 leading-[1.05] tracking-[-0.02em]">
                   {t('landing.cta_title')}<br /><span className="text-gradient">Solana</span>?
                 </h2>
@@ -850,7 +1035,7 @@ const Index = () => {
                   <Link to="/courses">
                     <Button size="lg" className="relative bg-solana-gradient text-background hover:opacity-90 px-10 gap-2.5 font-semibold rounded-xl h-13 text-sm overflow-hidden group shadow-lg shadow-primary/20">
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
-                      <span className="relative">{t('hero.cta_start')}</span> <ArrowRight className="w-4 h-4 relative" />
+                      <span className="relative">{t('hero.cta_start')}</span> <ArrowRight className="w-4 h-4 relative group-hover:translate-x-1 transition-transform" />
                     </Button>
                   </Link>
                   <Link to="/leaderboard">
@@ -885,7 +1070,7 @@ const Index = () => {
                 </div>
               </motion.div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
     </MainLayout>

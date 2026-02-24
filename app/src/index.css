@@ -290,4 +290,28 @@
       padding-right: 1rem;
     }
   }
+
+  /* Infinite marquee */
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee-scroll 25s linear infinite;
+  }
+  .marquee-track:hover {
+    animation-play-state: paused;
+  }
+  @keyframes marquee-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* 3D tilt perspective */
+  .tilt-card {
+    transform-style: preserve-3d;
+    perspective: 800px;
+    transition: transform 0.4s ease;
+  }
+  .tilt-card:hover {
+    transform: rotateY(var(--tilt-x, 0deg)) rotateX(var(--tilt-y, 0deg));
+  }
 }

@@ -49,7 +49,7 @@ SolDev Labs is a production-ready learning management system (LMS) built for Sol
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/solanabr/superteam-academy.git
+git clone https://github.com/Kawasan-Digital/superteam-academy
 cd superteam-academy/app
 
 # 2. Install dependencies

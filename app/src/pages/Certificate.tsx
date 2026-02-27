@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ExternalLink, Download, Share2, CheckCircle2, Shield, Sparkles, Copy } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -8,11 +8,44 @@ import { MOCK_CREDENTIALS } from '@/services/mock-data';
 import { Button } from '@/components/ui/button';
 import { useState, useRef, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
-
+import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 const Certificate = () => {
   const { id } = useParams();
   const { t } = useTranslation();
+  const { user } = useAuth();
   const credential = MOCK_CREDENTIALS.find(c => c.id === id) || MOCK_CREDENTIALS[0];
+
+  // Check if the user actually completed this course
+  const { data: hasCompleted, isLoading: checkingCompletion } = useQuery({
+    queryKey: ['certificate-check', user?.id, credential.courseId],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      // Get course from DB by matching courseId
+      const { data: course } = await supabase
+        .from('courses')
+        .select('id, course_modules(id, lessons(id))')
+        .or(`slug.eq.${credential.courseId},id.eq.${credential.courseId}`)
+        .maybeSingle();
+      if (!course) return true; // If course not in DB, allow (mock data)
+      
+      const allLessonIds = (course.course_modules ?? []).flatMap(
+        (m: any) => (m.lessons ?? []).map((l: any) => l.id)
+      );
+      if (allLessonIds.length === 0) return true;
+
+      const { data: completions } = await supabase
+        .from('lesson_completions')
+        .select('lesson_id')
+        .eq('user_id', user!.id)
+        .eq('course_id', course.id);
+      
+      const completedIds = new Set((completions ?? []).map(c => c.lesson_id));
+      return allLessonIds.every((id: string) => completedIds.has(id));
+    },
+  });
+  
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const certRef = useRef<HTMLDivElement>(null);
@@ -60,6 +93,29 @@ const Certificate = () => {
       toast({ title: 'Download failed', description: 'Could not generate certificate image.', variant: 'destructive' });
     }
   }, [credential.courseName]);
+
+  if (checkingCompletion) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (user && hasCompleted === false) {
+    return (
+      <MainLayout>
+        <div className="max-w-xl mx-auto px-4 py-20 text-center space-y-4">
+          <Shield className="w-12 h-12 text-muted-foreground mx-auto" />
+          <h2 className="text-xl font-bold text-foreground">Course Not Completed</h2>
+          <p className="text-muted-foreground">You need to complete all lessons before claiming this certificate.</p>
+          <Link to="/courses" className="text-primary hover:underline inline-block">Back to courses</Link>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>

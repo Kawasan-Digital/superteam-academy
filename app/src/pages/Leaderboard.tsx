@@ -38,8 +38,9 @@ const Leaderboard = () => {
 
   return (
     <MainLayout>
-      <SEO title={t('leaderboard.title')} description={t('leaderboard.subtitle')} path="/leaderboard" />
+      <SEO title="Leaderboard" description="See top SolDev Labs learners ranked by XP. Compete weekly, monthly, or all-time." path="/leaderboard" />
 
+      {/* Hero with gradient orbs */}
       <div className="relative overflow-hidden">
         <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-primary/8 blur-[120px] animate-pulse-glow pointer-events-none" />
         <div className="absolute -top-20 right-0 w-[400px] h-[400px] rounded-full bg-accent/6 blur-[100px] animate-pulse-glow pointer-events-none" style={{ animationDelay: '1s' }} />
@@ -49,26 +50,28 @@ const Leaderboard = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <div className="flex items-center gap-2 mb-2">
               <div className="h-px w-8 bg-primary/60" />
-              <p className="text-xs uppercase tracking-widest text-primary font-semibold">{t('leaderboard.rankings')}</p>
+              <p className="text-xs uppercase tracking-widest text-primary font-semibold">Rankings</p>
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-2">
                   {t('leaderboard.title')}
                 </h1>
-                <p className="text-sm text-muted-foreground mb-8">{t('leaderboard.subtitle')}</p>
+                <p className="text-sm text-muted-foreground mb-8">Top developers ranked by XP earned.</p>
               </div>
+              {/* On-chain indicator */}
               <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-medium border ${
                 heliusActive
                   ? 'bg-accent/10 text-accent border-accent/20'
                   : 'bg-secondary text-muted-foreground border-border/50'
               }`}>
                 {heliusActive ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                {heliusActive ? t('leaderboard.onchain') : t('leaderboard.offchain')}
+                {heliusActive ? 'On-Chain (Helius DAS)' : 'Off-Chain (Mock Data)'}
               </div>
             </div>
           </motion.div>
 
+          {/* Timeframe pills */}
           <div className="flex gap-1 mb-10 p-1 rounded-xl bg-secondary/50 w-fit backdrop-blur-sm border border-border/30">
             {timeframes.map(tf => (
               <button
@@ -148,10 +151,10 @@ const Leaderboard = () => {
 
                   <div className="grid grid-cols-12 gap-2 px-5 py-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border">
                     <div className="col-span-1">#</div>
-                    <div className="col-span-5">{t('leaderboard.learner')}</div>
-                    <div className="col-span-2 text-right">{t('leaderboard.xp')}</div>
-                    <div className="col-span-2 text-right">{t('leaderboard.level')}</div>
-                    <div className="col-span-2 text-right">{t('leaderboard.streak')}</div>
+                    <div className="col-span-5">Learner</div>
+                    <div className="col-span-2 text-right">XP</div>
+                    <div className="col-span-2 text-right">Level</div>
+                    <div className="col-span-2 text-right">Streak</div>
                   </div>
                   {rest.map((entry, i) => {
                     const isCurrentUser = entry.user.id === 'user-1';
@@ -174,7 +177,7 @@ const Leaderboard = () => {
                             </div>
                             <div>
                               <span className={`font-medium text-sm group-hover/row:text-primary transition-colors ${isCurrentUser ? 'text-primary' : 'text-foreground'}`}>{entry.user.displayName}</span>
-                              {isCurrentUser && <span className="text-[10px] text-primary ml-1.5">{t('leaderboard.you')}</span>}
+                              {isCurrentUser && <span className="text-[10px] text-primary ml-1.5">(you)</span>}
                             </div>
                           </div>
                           <div className="col-span-2 text-right flex items-center justify-end gap-1 text-xs relative">

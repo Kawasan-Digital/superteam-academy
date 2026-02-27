@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Play, CheckCircle2, Lightbulb, Eye, ChevronDown, ChevronUp, Terminal, FileCode, Zap, BookOpen, XCircle, Video } from 'lucide-react';
@@ -23,6 +24,7 @@ const Lesson = () => {
   const { slug, lessonId } = useParams();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const { data: course, isLoading } = useCourseBySlug(slug);
   const [code, setCode] = useState('');
   const [output, setOutput] = useState('');
@@ -136,27 +138,58 @@ const Lesson = () => {
   const isChallenge = lesson.type === 'challenge';
   const isVideo = lesson.type === 'video';
 
+  const progressPercent = allLessons.length > 0 ? Math.round(((lessonIndex) / allLessons.length) * 100) : 0;
+
   const contentPanel = (
     <div className="h-full overflow-y-auto">
-      <div className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          {isChallenge ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-              <FileCode className="w-3 h-3" /> Challenge
-            </span>
-          ) : isVideo ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-solana-purple/10 text-solana-purple text-xs font-medium">
-              <Video className="w-3 h-3" /> Video
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary text-muted-foreground text-xs font-medium">
-              <BookOpen className="w-3 h-3" /> Reading
-            </span>
-          )}
+      <div className="px-6 py-8 max-w-2xl mx-auto">
+        {/* Progress bar à la Duolingo */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              {isChallenge ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold border border-primary/20">
+                  <FileCode className="w-3.5 h-3.5" /> Challenge
+                </span>
+              ) : isVideo ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-solana-purple/10 text-solana-purple text-xs font-semibold border border-solana-purple/20">
+                  <Video className="w-3.5 h-3.5" /> Video
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-muted-foreground text-xs font-semibold border border-border/50">
+                  <BookOpen className="w-3.5 h-3.5" /> Reading
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground font-medium">{lessonIndex + 1} / {allLessons.length}</span>
+          </div>
+          <div className="h-2.5 rounded-full bg-secondary overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPercent}%` }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              className="h-full rounded-full bg-solana-gradient relative"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[gradient-shift_3s_ease_infinite] bg-[length:200%_100%]" />
+            </motion.div>
+          </div>
         </div>
 
+        {/* Lesson title card */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground text-center mb-3">{lesson.title}</h1>
+          <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1 bg-accent/10 text-accent px-2.5 py-1 rounded-full font-semibold">
+              <Zap className="w-3 h-3" /> +{lesson.xpReward} XP
+            </span>
+            <span className="flex items-center gap-1">
+              <BookOpen className="w-3 h-3" /> {course.title}
+            </span>
+          </div>
+        </motion.div>
+
         {isVideo && lesson.videoUrl && (
-          <div className="mb-6 rounded-xl overflow-hidden border border-border bg-black aspect-video">
+          <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="mb-8 rounded-2xl overflow-hidden border border-border bg-black aspect-video shadow-lg">
             {lesson.videoUrl.includes('youtube.com') || lesson.videoUrl.includes('youtu.be') ? (
               <iframe
                 src={lesson.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
@@ -166,78 +199,91 @@ const Lesson = () => {
                 title={lesson.title}
               />
             ) : (
-              <video src={lesson.videoUrl} controls className="w-full h-full" />
+              <video src={lesson.videoUrl} controls playsInline className="w-full h-full" />
             )}
-          </div>
+          </motion.div>
         )}
 
-        <div className="prose prose-invert max-w-none prose-headings:font-display prose-headings:text-foreground prose-h1:text-2xl prose-h1:font-bold prose-h1:mb-4 prose-h2:text-xl prose-h2:font-semibold prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-4 prose-h3:mb-2 prose-p:text-muted-foreground prose-p:mb-3 prose-p:leading-relaxed prose-strong:text-foreground prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:before:content-none prose-code:after:content-none prose-pre:bg-secondary prose-pre:border prose-pre:border-border prose-pre:rounded-xl prose-a:text-primary prose-a:underline prose-li:text-muted-foreground prose-ul:my-3 prose-ol:my-3">
-          <ReactMarkdown>{lesson.content}</ReactMarkdown>
-        </div>
+        {/* Content in styled card */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+          className="rounded-2xl border border-border/50 bg-card p-6 sm:p-8 shadow-sm mb-6"
+        >
+          <div className="prose prose-invert max-w-none prose-headings:font-display prose-headings:text-foreground prose-h1:text-2xl prose-h1:font-bold prose-h1:mb-4 prose-h2:text-xl prose-h2:font-semibold prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-4 prose-h3:mb-2 prose-p:text-muted-foreground prose-p:mb-3 prose-p:leading-relaxed prose-strong:text-foreground prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:before:content-none prose-code:after:content-none prose-pre:bg-secondary prose-pre:border prose-pre:border-border prose-pre:rounded-xl prose-a:text-primary prose-a:underline prose-li:text-muted-foreground prose-ul:my-3 prose-ol:my-3">
+            <ReactMarkdown>{lesson.content}</ReactMarkdown>
+          </div>
+        </motion.div>
 
         {isChallenge && lesson.challenge && (
-          <div className="mt-6 space-y-3 border-t border-border pt-4">
-            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Zap className="w-4 h-4 text-accent" /> Challenge Instructions
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+            className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-6 sm:p-8 space-y-4 mb-6"
+          >
+            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Zap className="w-4 h-4 text-primary" />
+              </div>
+              Challenge Instructions
             </h3>
-            <p className="text-sm text-muted-foreground">{lesson.challenge.instructions}</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">{lesson.challenge.instructions}</p>
 
             {lesson.challenge.testCases.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('lesson.tests')}</p>
+              <div className="space-y-2 pt-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t('lesson.tests')}</p>
                 {lesson.challenge.testCases.map((tc, i) => {
                   const result = testResults[i];
                   const isPassed = result?.passed === true;
                   const isFailed = result?.passed === false;
                   return (
-                    <div key={i} className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border text-xs transition-colors ${
-                      isPassed ? 'border-accent/20 bg-accent/5' : isFailed ? 'border-destructive/20 bg-destructive/5' : 'border-border bg-secondary/20'
-                    }`}>
-                      {isPassed ? <CheckCircle2 className="w-4 h-4 text-accent flex-shrink-0" />
-                        : isFailed ? <XCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+                    <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm transition-all ${
+                        isPassed ? 'border-accent/30 bg-accent/10 shadow-sm shadow-accent/5' : isFailed ? 'border-destructive/30 bg-destructive/10' : 'border-border bg-card'
+                      }`}
+                    >
+                      {isPassed ? <CheckCircle2 className="w-5 h-5 text-accent flex-shrink-0" />
+                        : isFailed ? <XCircle className="w-5 h-5 text-destructive flex-shrink-0" />
                         : running && testResults.length === i ? (
-                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full flex-shrink-0" />
-                        ) : <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30 flex-shrink-0" />}
-                      <span className="text-foreground font-medium">{tc.name}</span>
-                      {isPassed && <span className="ml-auto text-accent">Passed</span>}
-                      {isFailed && <span className="ml-auto text-destructive">Failed</span>}
-                    </div>
+                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full flex-shrink-0" />
+                        ) : <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/20 flex-shrink-0" />}
+                      <span className="text-foreground font-medium flex-1">{tc.name}</span>
+                      {isPassed && <span className="text-accent text-xs font-semibold">✓ Passed</span>}
+                      {isFailed && <span className="text-destructive text-xs font-semibold">✗ Failed</span>}
+                    </motion.div>
                   );
                 })}
               </div>
             )}
 
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setShowHint(!showHint)} className="flex items-center gap-1.5 text-xs text-accent hover:underline transition-colors">
-                <Lightbulb className="w-3.5 h-3.5" /> {showHint ? 'Hide Hint' : t('lesson.hint')}
+              <button onClick={() => setShowHint(!showHint)} className="flex items-center gap-1.5 text-sm text-accent hover:text-accent/80 font-medium transition-colors px-3 py-2 rounded-xl hover:bg-accent/10">
+                <Lightbulb className="w-4 h-4" /> {showHint ? 'Hide Hint' : t('lesson.hint')}
               </button>
-              <button onClick={() => setShowSolution(!showSolution)} className="flex items-center gap-1.5 text-xs text-primary hover:underline transition-colors">
-                <Eye className="w-3.5 h-3.5" /> {showSolution ? 'Hide Solution' : t('lesson.solution')}
+              <button onClick={() => setShowSolution(!showSolution)} className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 font-medium transition-colors px-3 py-2 rounded-xl hover:bg-primary/10">
+                <Eye className="w-4 h-4" /> {showSolution ? 'Hide Solution' : t('lesson.solution')}
               </button>
             </div>
             {showHint && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="p-3 rounded-lg bg-accent/5 border border-accent/20 text-sm text-muted-foreground">
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="p-4 rounded-xl bg-accent/10 border border-accent/20 text-sm text-muted-foreground">
                 💡 Think about how the instruction data is structured and what accounts you need to pass.
               </motion.div>
             )}
             {showSolution && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                <pre className="p-3 rounded-lg bg-secondary text-xs font-mono text-foreground overflow-x-auto">{lesson.challenge.starterCode}</pre>
+                <pre className="p-4 rounded-xl bg-secondary text-xs font-mono text-foreground overflow-x-auto border border-border">{lesson.challenge.starterCode}</pre>
               </motion.div>
             )}
-          </div>
+          </motion.div>
         )}
 
         {!isChallenge && (
-          <div className="mt-8">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="flex justify-center">
             <Button
               onClick={handleContentComplete}
               disabled={completed}
-              className={`gap-2 ${completed ? 'bg-accent text-accent-foreground' : 'bg-solana-gradient text-background hover:opacity-90'}`}
+              size="lg"
+              className={`gap-2 rounded-2xl px-8 py-6 text-base font-bold shadow-lg transition-all ${completed ? 'bg-accent text-accent-foreground shadow-accent/20' : 'bg-solana-gradient text-background hover:opacity-90 hover:shadow-xl hover:scale-[1.02] shadow-primary/20'}`}
             >
-              {completed ? <><CheckCircle2 className="w-4 h-4" /> Completed +{lesson.xpReward} XP</> : <><Zap className="w-4 h-4" /> {t('lesson.complete')}</>}
+              {completed ? <><CheckCircle2 className="w-5 h-5" /> Completed +{lesson.xpReward} XP</> : <><Zap className="w-5 h-5" /> {t('lesson.complete')}</>}
             </Button>
-          </div>
+          </motion.div>
         )}
       </div>
     </div>
@@ -303,6 +349,38 @@ const Lesson = () => {
         {/* Main content */}
         <div className="flex-1 overflow-hidden">
           {isChallenge ? (
+            isMobile ? (
+              <div className="h-full flex flex-col overflow-y-auto">
+                <div className="flex-shrink-0">{contentPanel}</div>
+                <div className="flex flex-col border-t border-border">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {lesson.challenge?.language === 'rust' ? 'solution.rs' : lesson.challenge?.language === 'json' ? 'solution.json' : 'solution.ts'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <AICodeReview code={code} language={lesson.challenge?.language || 'typescript'} challengeInstructions={lesson.challenge?.instructions || ''} />
+                      <Button size="sm" onClick={handleRun} disabled={running || completed}
+                        className={`gap-2 font-medium ${completed ? 'bg-accent/20 text-accent border border-accent/30' : 'bg-accent text-accent-foreground hover:bg-accent/90'}`}
+                      >
+                        {running ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="w-3.5 h-3.5 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full" />
+                          : completed ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                        {running ? 'Running...' : completed ? 'Passed' : t('lesson.run')}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="min-h-[300px]">
+                    <CodeEditor value={code} onChange={setCode} language={lesson.challenge?.language || 'typescript'} />
+                  </div>
+                  <div className="border-t border-border bg-card/30">
+                    <pre className="p-4 text-xs font-mono text-foreground/80 min-h-[60px] max-h-32 overflow-y-auto whitespace-pre-wrap">
+                      {output || <span className="text-muted-foreground">Run your code to see output...</span>}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            ) : (
             <ResizablePanelGroup direction="horizontal" className="h-full">
               <ResizablePanel defaultSize={42} minSize={25}>{contentPanel}</ResizablePanel>
               <ResizableHandle withHandle />
@@ -362,7 +440,16 @@ const Lesson = () => {
                 </div>
               </ResizablePanel>
             </ResizablePanelGroup>
+            )
           ) : (
+            isMobile ? (
+              <div className="h-full flex flex-col overflow-y-auto">
+                <div className="flex-shrink-0">{contentPanel}</div>
+                <div className="border-t border-border flex-shrink-0">
+                  <AITutorChat lessonTitle={lesson.title} lessonContent={lesson.content} courseTitle={course.title} />
+                </div>
+              </div>
+            ) : (
             <ResizablePanelGroup direction="horizontal" className="h-full">
               <ResizablePanel defaultSize={65} minSize={40}>{contentPanel}</ResizablePanel>
               <ResizableHandle withHandle />
@@ -370,6 +457,7 @@ const Lesson = () => {
                 <AITutorChat lessonTitle={lesson.title} lessonContent={lesson.content} courseTitle={course.title} />
               </ResizablePanel>
             </ResizablePanelGroup>
+            )
           )}
         </div>
 

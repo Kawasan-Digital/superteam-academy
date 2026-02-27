@@ -35,11 +35,11 @@ export function AICodeReview({ code, language, challengeInstructions }: AICodeRe
   }, [code, language, challengeInstructions, loading]);
 
   return (
-    <>
+    <div className="relative">
       <Button
         variant="outline"
         size="sm"
-        onClick={requestReview}
+        onClick={(e) => { e.stopPropagation(); requestReview(); }}
         disabled={loading || !code.trim()}
         className="gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/10"
       >
@@ -50,10 +50,10 @@ export function AICodeReview({ code, language, challengeInstructions }: AICodeRe
       <AnimatePresence>
         {show && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-3 rounded-xl border border-primary/20 bg-primary/5 overflow-hidden"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="absolute right-0 top-full mt-2 w-[380px] max-w-[90vw] rounded-xl border border-primary/20 bg-card shadow-xl z-50 overflow-hidden"
           >
             <div className="flex items-center justify-between px-3 py-2 border-b border-primary/10">
               <span className="text-xs font-medium text-primary flex items-center gap-1.5">
@@ -77,6 +77,6 @@ export function AICodeReview({ code, language, challengeInstructions }: AICodeRe
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 }

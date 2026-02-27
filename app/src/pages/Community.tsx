@@ -10,7 +10,6 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useTranslation } from '@/i18n/LanguageContext';
 
 type Category = 'all' | 'general' | 'help' | 'showcase' | 'bugs';
 type SortBy = 'latest' | 'popular' | 'unanswered';
@@ -40,6 +39,14 @@ interface Thread {
   lastActivity: string;
 }
 
+const CATEGORIES: { key: Category; label: string; icon: typeof MessageSquare; color: string }[] = [
+  { key: 'all', label: 'All Topics', icon: MessageSquare, color: 'text-foreground' },
+  { key: 'general', label: 'General', icon: MessageCircle, color: 'text-primary' },
+  { key: 'help', label: 'Q&A / Help', icon: HelpCircle, color: 'text-accent' },
+  { key: 'showcase', label: 'Showcase', icon: Lightbulb, color: 'text-solana-purple' },
+  { key: 'bugs', label: 'Bug Reports', icon: Bug, color: 'text-destructive' },
+];
+
 const INITIAL_THREADS: Thread[] = [
   {
     id: '1', title: 'How to implement CPI in Anchor?', body: 'I\'m trying to make a cross-program invocation from my Anchor program to the Token program. What\'s the best pattern for this?\n\nI\'ve tried using the `CpiContext` but keep getting account validation errors. Here\'s what I have:\n\n```rust\nlet cpi_accounts = Transfer {\n    from: ctx.accounts.source.to_account_info(),\n    to: ctx.accounts.destination.to_account_info(),\n    authority: ctx.accounts.authority.to_account_info(),\n};\n```\n\nAny help would be appreciated!',
@@ -50,7 +57,7 @@ const INITIAL_THREADS: Thread[] = [
     ], views: 342, solved: true, createdAt: '2h ago', lastActivity: '30m ago',
   },
   {
-    id: '2', title: '📢 Welcome to SolDev Labs Community!', body: 'This is the official community forum for SolDev Labs.',
+    id: '2', title: '📢 Welcome to SolDev Labs Community!', body: 'This is the official community forum for SolDev Labs. Here you can:\n\n- **Ask questions** about Solana development\n- **Share your projects** and get feedback\n- **Report bugs** you find in the platform\n- **Connect** with fellow developers\n\nPlease be respectful and follow our community guidelines. Happy building! 🚀',
     author: { name: 'SolDev Team', level: 50, xp: 99999 }, category: 'general', tags: ['Announcement'],
     votes: 89, replies: [
       { id: 'r3', author: { name: 'web3noob', level: 3 }, body: 'Excited to be here! Just started learning Solana development. 🎉', votes: 12, createdAt: '2d ago' },
@@ -58,40 +65,40 @@ const INITIAL_THREADS: Thread[] = [
     ], views: 1205, pinned: true, createdAt: '3d ago', lastActivity: '1h ago',
   },
   {
-    id: '3', title: 'Built a DEX aggregator — feedback welcome!', body: 'Just finished my capstone project: a DEX aggregator that finds the best swap routes across Raydium, Orca, and Jupiter.',
+    id: '3', title: 'Built a DEX aggregator — feedback welcome!', body: 'Just finished my capstone project: a DEX aggregator that finds the best swap routes across Raydium, Orca, and Jupiter.\n\nFeatures:\n- Multi-hop routing for best prices\n- Slippage protection\n- Transaction simulation before execution\n- Real-time price feeds via Pyth\n\nCheck it out and let me know what you think!',
     author: { name: 'rustLover', level: 12, xp: 14400 }, category: 'showcase', tags: ['DeFi', 'Project', 'TypeScript'],
     votes: 45, replies: [
-      { id: 'r5', author: { name: 'defiBuilder', level: 10 }, body: 'This is incredible! How did you handle the routing algorithm?', votes: 9, createdAt: '20h ago' },
+      { id: 'r5', author: { name: 'defiBuilder', level: 10 }, body: 'This is incredible! How did you handle the routing algorithm? Dijkstra or something custom?', votes: 9, createdAt: '20h ago' },
     ], views: 567, createdAt: '1d ago', lastActivity: '4h ago',
   },
   {
-    id: '4', title: 'Token-2022 NonTransferable mint not working', body: 'Getting an error when trying to create a NonTransferable token mint.',
+    id: '4', title: 'Token-2022 NonTransferable mint not working', body: 'Getting an error when trying to create a NonTransferable token mint. The instruction seems correct but the transaction fails with "custom program error: 0x0".\n\nUsing `@solana/spl-token` v0.4.x. Anyone else experiencing this?',
     author: { name: 'web3noob', level: 3, xp: 900 }, category: 'bugs', tags: ['Token-2022', 'SPL'],
     votes: 7, replies: [
-      { id: 'r6', author: { name: 'solanaDev42', level: 8 }, body: 'Make sure you\'re using the Token-2022 program ID, not the legacy Token program.', votes: 5, createdAt: '3h ago' },
+      { id: 'r6', author: { name: 'solanaDev42', level: 8 }, body: 'Make sure you\'re using the Token-2022 program ID, not the legacy Token program. They\'re different!', votes: 5, createdAt: '3h ago' },
     ], views: 89, createdAt: '5h ago', lastActivity: '2h ago',
   },
   {
-    id: '5', title: 'Best practices for PDA derivation?', body: 'What seeds should I use for PDA derivation in a marketplace program?',
+    id: '5', title: 'Best practices for PDA derivation?', body: 'What seeds should I use for PDA derivation in a marketplace program? Looking for patterns that scale well.\n\nCurrently thinking of using `[b"listing", seller.key().as_ref(), mint.key().as_ref()]` but worried about collisions.',
     author: { name: 'anchorPro', level: 15, xp: 22500 }, category: 'help', tags: ['PDA', 'Architecture', 'Anchor'],
     votes: 31, replies: [
-      { id: 'r7', author: { name: 'SolDev Team', level: 50 }, body: 'Your approach is solid. Using the seller + mint combination ensures uniqueness per listing.', votes: 22, createdAt: '8h ago', isAccepted: true },
+      { id: 'r7', author: { name: 'SolDev Team', level: 50 }, body: 'Your approach is solid. Using the seller + mint combination ensures uniqueness per listing. You might also add a `listing_id` counter for allowing multiple listings of the same mint by the same seller.', votes: 22, createdAt: '8h ago', isAccepted: true },
     ], views: 423, solved: true, createdAt: '12h ago', lastActivity: '1h ago',
   },
   {
-    id: '6', title: 'Metaplex Core vs Token Metadata — which to use?', body: 'Starting a new NFT project and wondering whether to use Metaplex Core or the legacy Token Metadata standard.',
+    id: '6', title: 'Metaplex Core vs Token Metadata — which to use?', body: 'Starting a new NFT project and wondering whether to use Metaplex Core or the legacy Token Metadata standard. What are the tradeoffs?',
     author: { name: 'nftBuilder', level: 6, xp: 3600 }, category: 'general', tags: ['Metaplex', 'NFT'],
     votes: 19, replies: [
-      { id: 'r8', author: { name: 'rustLover', level: 12 }, body: 'Metaplex Core is the future. Much simpler API, lower costs, and better composability.', votes: 14, createdAt: '18h ago' },
+      { id: 'r8', author: { name: 'rustLover', level: 12 }, body: 'Metaplex Core is the future. Much simpler API, lower costs, and better composability. Go with Core unless you need legacy compatibility.', votes: 14, createdAt: '18h ago' },
     ], views: 298, createdAt: '1d ago', lastActivity: '6h ago',
   },
   {
-    id: '7', title: 'My on-chain game — Solana Battleships', body: 'Check out my fully on-chain battleship game built with Anchor.',
+    id: '7', title: 'My on-chain game — Solana Battleships', body: 'Check out my fully on-chain battleship game built with Anchor. All game state lives on-chain with commit-reveal pattern for hiding ship positions.\n\nKey techniques:\n- Commit-reveal for hidden information\n- Clock-based timeouts for AFK players\n- Verifiable randomness for tie-breaking',
     author: { name: 'gameDevSol', level: 10, xp: 10000 }, category: 'showcase', tags: ['Gaming', 'Anchor', 'On-chain'],
     votes: 62, replies: [], views: 891, createdAt: '2d ago', lastActivity: '3h ago',
   },
   {
-    id: '8', title: 'How do I read account data in frontend?', body: 'New to Solana development. How do I deserialize account data from an Anchor program in my React frontend?',
+    id: '8', title: 'How do I read account data in frontend?', body: 'New to Solana development. How do I deserialize account data from an Anchor program in my React frontend? I\'ve set up the wallet adapter but can\'t figure out how to fetch and decode on-chain accounts.',
     author: { name: 'newbie_dev', level: 1, xp: 100 }, category: 'help', tags: ['Frontend', 'React', 'Beginner'],
     votes: 5, replies: [], views: 34, createdAt: '1h ago', lastActivity: '1h ago',
   },
@@ -117,7 +124,6 @@ const LevelBadgeInline = ({ level }: { level: number }) => {
 };
 
 const Community = () => {
-  const { t } = useTranslation();
   const [threads, setThreads] = useState<Thread[]>(INITIAL_THREADS);
   const [category, setCategory] = useState<Category>('all');
   const [sortBy, setSortBy] = useState<SortBy>('latest');
@@ -130,14 +136,6 @@ const Community = () => {
   const [newCategory, setNewCategory] = useState<Exclude<Category, 'all'>>('general');
   const [newTags, setNewTags] = useState('');
   const { toast } = useToast();
-
-  const CATEGORIES: { key: Category; labelKey: string; icon: typeof MessageSquare; color: string }[] = [
-    { key: 'all', labelKey: 'community.all_topics', icon: MessageSquare, color: 'text-foreground' },
-    { key: 'general', labelKey: 'community.general', icon: MessageCircle, color: 'text-primary' },
-    { key: 'help', labelKey: 'community.help', icon: HelpCircle, color: 'text-accent' },
-    { key: 'showcase', labelKey: 'community.showcase', icon: Lightbulb, color: 'text-solana-purple' },
-    { key: 'bugs', labelKey: 'community.bugs', icon: Bug, color: 'text-destructive' },
-  ];
 
   const filtered = threads
     .filter(t => category === 'all' || t.category === category)
@@ -170,7 +168,7 @@ const Community = () => {
     setSelectedThread(updated);
     setThreads(prev => prev.map(t => t.id === selectedThread.id ? updated : t));
     setReplyText('');
-    toast({ title: t('community.reply_posted'), description: t('community.reply_posted_desc') });
+    toast({ title: 'Reply posted!', description: 'Your reply has been added to the thread.' });
   };
 
   const handleReplyVote = (replyId: string, dir: 1 | -1) => {
@@ -203,7 +201,7 @@ const Community = () => {
     setNewBody('');
     setNewTags('');
     setNewThreadOpen(false);
-    toast({ title: t('community.thread_created'), description: t('community.thread_created_desc') });
+    toast({ title: 'Thread created!', description: 'Your new thread has been posted.' });
   };
 
   const stats = { threads: threads.length, members: 3891, answers: threads.reduce((s, t) => s + t.replies.length, 0), online: 142 };
@@ -212,19 +210,20 @@ const Community = () => {
   if (selectedThread) {
     return (
       <MainLayout>
-        <SEO title={`${selectedThread.title} — ${t('community.title')}`} description={selectedThread.body.slice(0, 160)} path="/community" />
+        <SEO title={`${selectedThread.title} — Community`} description={selectedThread.body.slice(0, 160)} path="/community" />
         <div className="relative min-h-screen">
           <div className="absolute top-1/4 -left-32 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <button onClick={() => setSelectedThread(null)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
-                <ArrowLeft className="w-4 h-4" /> {t('community.back')}
+                <ArrowLeft className="w-4 h-4" /> Back to threads
               </button>
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <PremiumCard className="p-6 sm:p-8 mb-6">
                 <div className="flex gap-4">
+                  {/* Votes */}
                   <div className="flex flex-col items-center gap-1 min-w-[48px]">
                     <button onClick={() => handleVote(selectedThread.id, 1)} className="p-1 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-all">
                       <ChevronUp className="w-5 h-5" />
@@ -237,8 +236,8 @@ const Community = () => {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start gap-2 mb-3 flex-wrap">
-                      {selectedThread.pinned && <Badge variant="secondary" className="text-[10px] gap-1"><Pin className="w-3 h-3" /> {t('community.pinned')}</Badge>}
-                      {selectedThread.solved && <Badge className="text-[10px] gap-1 bg-accent/10 text-accent border-accent/20"><CheckCircle className="w-3 h-3" /> {t('community.solved')}</Badge>}
+                      {selectedThread.pinned && <Badge variant="secondary" className="text-[10px] gap-1"><Pin className="w-3 h-3" /> Pinned</Badge>}
+                      {selectedThread.solved && <Badge className="text-[10px] gap-1 bg-accent/10 text-accent border-accent/20"><CheckCircle className="w-3 h-3" /> Solved</Badge>}
                       <Badge variant="secondary" className="text-[10px] capitalize">{selectedThread.category}</Badge>
                     </div>
 
@@ -261,7 +260,7 @@ const Community = () => {
                         <LevelBadgeInline level={selectedThread.author.level} />
                       </div>
                       <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> {selectedThread.createdAt}</span>
-                      <span className="text-xs text-muted-foreground flex items-center gap-1"><Eye className="w-3 h-3" /> {selectedThread.views} {t('community.views')}</span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1"><Eye className="w-3 h-3" /> {selectedThread.views} views</span>
                     </div>
 
                     <div className="flex flex-wrap gap-1.5 mt-3">
@@ -276,7 +275,7 @@ const Community = () => {
             <div className="mb-6">
               <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
                 <MessageCircle className="w-4 h-4 text-primary" />
-                {selectedThread.replies.length} {t('community.replies')}
+                {selectedThread.replies.length} {selectedThread.replies.length === 1 ? 'Reply' : 'Replies'}
               </h3>
 
               <div className="space-y-3">
@@ -299,7 +298,7 @@ const Community = () => {
                           <div className="flex-1 min-w-0">
                             {reply.isAccepted && (
                               <div className="flex items-center gap-1 text-accent text-[10px] font-bold mb-2">
-                                <CheckCircle className="w-3 h-3" /> {t('community.accepted_answer')}
+                                <CheckCircle className="w-3 h-3" /> Accepted Answer
                               </div>
                             )}
                             <div className="text-sm text-muted-foreground leading-relaxed mb-3 whitespace-pre-wrap">
@@ -325,16 +324,16 @@ const Community = () => {
             {/* Reply form */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
               <PremiumCard className="p-5">
-                <h4 className="text-sm font-semibold text-foreground mb-3">{t('community.post_reply')}</h4>
+                <h4 className="text-sm font-semibold text-foreground mb-3">Post a Reply</h4>
                 <Textarea
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}
-                  placeholder={t('community.write_reply')}
+                  placeholder="Share your knowledge, ask a follow-up, or help out..."
                   className="bg-background/50 border-border/50 rounded-xl mb-3 min-h-[100px] text-sm"
                 />
                 <div className="flex justify-end">
                   <Button onClick={handleReply} disabled={!replyText.trim()} className="gap-2 bg-solana-gradient text-background hover:opacity-90">
-                    <Send className="w-4 h-4" /> {t('community.reply')}
+                    <Send className="w-4 h-4" /> Reply
                   </Button>
                 </div>
               </PremiumCard>
@@ -348,7 +347,7 @@ const Community = () => {
   // ─── Thread List View ───
   return (
     <MainLayout>
-      <SEO title={`${t('community.title')} — SolDev Labs`} description={t('community.subtitle')} path="/community" />
+      <SEO title="Community — SolDev Labs" description="Join the SolDev Labs community. Ask questions, share projects, and connect with Solana developers." path="/community" />
 
       <div className="relative min-h-screen">
         <div className="absolute top-1/4 -left-32 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
@@ -360,27 +359,27 @@ const Community = () => {
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
               <div>
                 <h1 className="font-display text-4xl font-bold text-foreground mb-2">
-                  {t('community.title')} <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">{t('community.forum')}</span>
+                  Community <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">Forum</span>
                 </h1>
-                <p className="text-muted-foreground">{t('community.forum_desc')}</p>
+                <p className="text-muted-foreground">Ask questions, share knowledge, and connect with Solana builders.</p>
               </div>
               <Dialog open={newThreadOpen} onOpenChange={setNewThreadOpen}>
                 <DialogTrigger asChild>
                   <Button className="gap-2 bg-solana-gradient text-background hover:opacity-90 font-semibold self-start sm:self-auto">
-                    <Plus className="w-4 h-4" /> {t('community.new_thread')}
+                    <Plus className="w-4 h-4" /> New Thread
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-lg">
                   <DialogHeader>
-                    <DialogTitle className="font-display">{t('community.create_dialog')}</DialogTitle>
+                    <DialogTitle className="font-display">Create New Thread</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 mt-2">
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('community.create_title')}</label>
-                      <Input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder={t('community.create_title_placeholder')} className="bg-background/50 rounded-xl" />
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Title</label>
+                      <Input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="What's your question or topic?" className="bg-background/50 rounded-xl" />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('community.create_category')}</label>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Category</label>
                       <div className="flex gap-2 flex-wrap">
                         {CATEGORIES.filter(c => c.key !== 'all').map(cat => (
                           <button
@@ -390,21 +389,21 @@ const Community = () => {
                               newCategory === cat.key ? 'bg-primary/10 text-primary border border-primary/20' : 'text-muted-foreground bg-secondary/30 border border-border/20'
                             }`}
                           >
-                            <cat.icon className="w-3 h-3" /> {t(cat.labelKey)}
+                            <cat.icon className="w-3 h-3" /> {cat.label}
                           </button>
                         ))}
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('community.create_body')}</label>
-                      <Textarea value={newBody} onChange={e => setNewBody(e.target.value)} placeholder={t('community.create_body_placeholder')} className="bg-background/50 rounded-xl min-h-[120px]" />
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Content</label>
+                      <Textarea value={newBody} onChange={e => setNewBody(e.target.value)} placeholder="Describe your question or share your thoughts..." className="bg-background/50 rounded-xl min-h-[120px]" />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('community.create_tags')}</label>
-                      <Input value={newTags} onChange={e => setNewTags(e.target.value)} placeholder={t('community.create_tags_placeholder')} className="bg-background/50 rounded-xl" />
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Tags (comma separated)</label>
+                      <Input value={newTags} onChange={e => setNewTags(e.target.value)} placeholder="Anchor, Rust, DeFi" className="bg-background/50 rounded-xl" />
                     </div>
                     <Button onClick={handleCreateThread} disabled={!newTitle.trim() || !newBody.trim()} className="w-full gap-2 bg-solana-gradient text-background hover:opacity-90">
-                      <Send className="w-4 h-4" /> {t('community.create_submit')}
+                      <Send className="w-4 h-4" /> Post Thread
                     </Button>
                   </div>
                 </DialogContent>
@@ -415,10 +414,10 @@ const Community = () => {
           {/* Stats */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
             {[
-              { label: t('community.threads'), value: stats.threads.toLocaleString(), icon: MessageSquare },
-              { label: t('community.members'), value: stats.members.toLocaleString(), icon: User },
-              { label: t('community.answers'), value: stats.answers.toLocaleString(), icon: CheckCircle },
-              { label: t('community.online'), value: stats.online.toString(), icon: TrendingUp },
+              { label: 'Threads', value: stats.threads.toLocaleString(), icon: MessageSquare },
+              { label: 'Members', value: stats.members.toLocaleString(), icon: User },
+              { label: 'Answers', value: stats.answers.toLocaleString(), icon: CheckCircle },
+              { label: 'Online Now', value: stats.online.toString(), icon: TrendingUp },
             ].map(s => (
               <PremiumCard key={s.label} className="p-4 text-center">
                 <s.icon className="w-4 h-4 text-primary mx-auto mb-1" />
@@ -432,13 +431,13 @@ const Community = () => {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex flex-col md:flex-row gap-3 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('community.search')} className="pl-10 bg-background/50 border-border/50 rounded-xl" />
+              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search threads, tags..." className="pl-10 bg-background/50 border-border/50 rounded-xl" />
             </div>
             <Tabs value={sortBy} onValueChange={v => setSortBy(v as SortBy)}>
               <TabsList className="bg-secondary/30 border border-border/20 rounded-xl">
-                <TabsTrigger value="latest" className="text-xs rounded-lg">{t('community.latest')}</TabsTrigger>
-                <TabsTrigger value="popular" className="text-xs rounded-lg">{t('community.popular')}</TabsTrigger>
-                <TabsTrigger value="unanswered" className="text-xs rounded-lg">{t('community.unanswered')}</TabsTrigger>
+                <TabsTrigger value="latest" className="text-xs rounded-lg">Latest</TabsTrigger>
+                <TabsTrigger value="popular" className="text-xs rounded-lg">Popular</TabsTrigger>
+                <TabsTrigger value="unanswered" className="text-xs rounded-lg">Unanswered</TabsTrigger>
               </TabsList>
             </Tabs>
           </motion.div>
@@ -455,11 +454,11 @@ const Community = () => {
                   }`}
                 >
                   <cat.icon className={`w-4 h-4 ${category === cat.key ? 'text-primary' : cat.color}`} />
-                  {t(cat.labelKey)}
+                  {cat.label}
                 </button>
               ))}
               <div className="pt-6">
-                <p className="text-xs font-semibold text-muted-foreground mb-3 px-3">{t('community.popular_tags')}</p>
+                <p className="text-xs font-semibold text-muted-foreground mb-3 px-3">POPULAR TAGS</p>
                 <div className="flex flex-wrap gap-1.5 px-3">
                   {['Anchor', 'Rust', 'Token-2022', 'DeFi', 'NFT', 'CPI', 'PDA', 'Frontend'].map(tag => (
                     <Badge key={tag} variant="secondary" className="text-[10px] cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors" onClick={() => setSearch(tag)}>
@@ -480,7 +479,7 @@ const Community = () => {
                     category === cat.key ? 'bg-primary/10 text-primary border border-primary/20' : 'text-muted-foreground bg-secondary/30 border border-border/20'
                   }`}
                 >
-                  <cat.icon className="w-3 h-3" /> {t(cat.labelKey)}
+                  <cat.icon className="w-3 h-3" /> {cat.label}
                 </button>
               ))}
             </div>
@@ -544,7 +543,7 @@ const Community = () => {
               {filtered.length === 0 && (
                 <div className="text-center py-16">
                   <MessageSquare className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-muted-foreground">{t('community.no_threads')}</p>
+                  <p className="text-muted-foreground">No threads found. Try a different filter or start a new discussion!</p>
                 </div>
               )}
             </div>

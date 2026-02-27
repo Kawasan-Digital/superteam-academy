@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, BookOpen, TrendingUp, BarChart3, Settings2, Plus, Eye, Edit, Trash2, Search, Globe, Lock, RefreshCw, GraduationCap, Zap, Target, Calendar, Award, UserPlus, X, PieChart, Activity } from 'lucide-react';
+import { Users, BookOpen, TrendingUp, BarChart3, Settings2, Plus, Eye, Edit, Trash2, Search, Globe, Lock, RefreshCw, GraduationCap, Zap, Target, Calendar, Award, UserPlus, X, PieChart, Activity, Shield, ShieldCheck, ShieldX } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { SEO } from '@/components/SEO';
 import { Button } from '@/components/ui/button';
@@ -638,7 +638,20 @@ function CoursesTab() {
 function UsersTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [userRoles, setUserRoles] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
+  const [togglingRole, setTogglingRole] = useState<string | null>(null);
+
+  const loadRoles = useCallback(async (userIds: string[]) => {
+    if (userIds.length === 0) return;
+    const { data } = await supabase.from('user_roles').select('user_id, role').in('user_id', userIds);
+    const map: Record<string, string[]> = {};
+    (data || []).forEach((r: any) => {
+      if (!map[r.user_id]) map[r.user_id] = [];
+      map[r.user_id].push(r.role);
+    });
+    setUserRoles(map);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -647,11 +660,38 @@ function UsersTab() {
         .from('profiles')
         .select('display_name, username, xp, level, streak, joined_at, user_id')
         .order('xp', { ascending: false });
-      setUsers((data || []) as UserRow[]);
+      const usersData = (data || []) as UserRow[];
+      setUsers(usersData);
+      await loadRoles(usersData.map(u => u.user_id));
       setLoading(false);
     }
     load();
-  }, []);
+  }, [loadRoles]);
+
+  const toggleRole = async (userId: string, role: 'admin' | 'moderator') => {
+    setTogglingRole(`${userId}-${role}`);
+    const currentRoles = userRoles[userId] || [];
+    const hasRole = currentRoles.includes(role);
+
+    if (hasRole) {
+      const { error } = await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', role);
+      if (error) {
+        toast.error(`Failed to remove ${role} role`);
+      } else {
+        setUserRoles(prev => ({ ...prev, [userId]: (prev[userId] || []).filter(r => r !== role) }));
+        toast.success(`${role} role removed`);
+      }
+    } else {
+      const { error } = await supabase.from('user_roles').insert({ user_id: userId, role });
+      if (error) {
+        toast.error(`Failed to add ${role} role: ${error.message}`);
+      } else {
+        setUserRoles(prev => ({ ...prev, [userId]: [...(prev[userId] || []), role] }));
+        toast.success(`${role} role assigned`);
+      }
+    }
+    setTogglingRole(null);
+  };
 
   const filtered = users.filter(u =>
     u.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -677,6 +717,7 @@ function UsersTab() {
               <thead>
                 <tr className="border-b border-border/30">
                   <th className="text-left text-xs font-medium text-muted-foreground p-4">User</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground p-4">Role</th>
                   <th className="text-left text-xs font-medium text-muted-foreground p-4">Level</th>
                   <th className="text-left text-xs font-medium text-muted-foreground p-4">XP</th>
                   <th className="text-left text-xs font-medium text-muted-foreground p-4">Streak</th>
@@ -685,7 +726,9 @@ function UsersTab() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(u => (
+                {filtered.map(u => {
+                  const roles = userRoles[u.user_id] || [];
+                  return (
                   <tr key={u.user_id} className="border-b border-border/10 hover:bg-secondary/5 transition-colors">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
@@ -698,17 +741,47 @@ function UsersTab() {
                         </div>
                       </div>
                     </td>
+                    <td className="p-4">
+                      <div className="flex gap-1 flex-wrap">
+                        {roles.includes('admin') && <Badge className="text-[10px] bg-primary/15 text-primary border-primary/20"><Shield className="w-3 h-3 mr-1" />Admin</Badge>}
+                        {roles.includes('moderator') && <Badge className="text-[10px] bg-accent/15 text-accent border-accent/20"><ShieldCheck className="w-3 h-3 mr-1" />Mod</Badge>}
+                        {roles.length === 0 && <span className="text-xs text-muted-foreground">User</span>}
+                      </div>
+                    </td>
                     <td className="p-4 text-sm text-foreground">{u.level}</td>
                     <td className="p-4 text-sm text-accent font-medium">{u.xp.toLocaleString()}</td>
                     <td className="p-4 text-sm text-foreground">🔥 {u.streak}</td>
                     <td className="p-4 text-xs text-muted-foreground">{new Date(u.joined_at).toLocaleDateString()}</td>
                     <td className="p-4">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.open(`/profile/${u.username}`, '_blank')} title="View Profile"><Eye className="w-4 h-4" /></Button>
+                        <Button
+                          variant={roles.includes('admin') ? 'default' : 'outline'}
+                          size="sm"
+                          className={`h-7 text-[10px] gap-1 rounded-lg ${roles.includes('admin') ? 'bg-primary/15 text-primary hover:bg-primary/25 border border-primary/20' : 'border-border/50'}`}
+                          disabled={togglingRole === `${u.user_id}-admin`}
+                          onClick={() => toggleRole(u.user_id, 'admin')}
+                          title={roles.includes('admin') ? 'Remove Admin' : 'Make Admin'}
+                        >
+                          {togglingRole === `${u.user_id}-admin` ? <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" /> : roles.includes('admin') ? <ShieldX className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
+                          {roles.includes('admin') ? 'Remove Admin' : 'Admin'}
+                        </Button>
+                        <Button
+                          variant={roles.includes('moderator') ? 'default' : 'outline'}
+                          size="sm"
+                          className={`h-7 text-[10px] gap-1 rounded-lg ${roles.includes('moderator') ? 'bg-accent/15 text-accent hover:bg-accent/25 border border-accent/20' : 'border-border/50'}`}
+                          disabled={togglingRole === `${u.user_id}-moderator`}
+                          onClick={() => toggleRole(u.user_id, 'moderator')}
+                          title={roles.includes('moderator') ? 'Remove Moderator' : 'Make Moderator'}
+                        >
+                          {togglingRole === `${u.user_id}-moderator` ? <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" /> : roles.includes('moderator') ? <ShieldX className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3" />}
+                          {roles.includes('moderator') ? 'Remove Mod' : 'Mod'}
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.open(`/profile/${u.username}`, '_blank')} title="View Profile"><Eye className="w-3.5 h-3.5" /></Button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

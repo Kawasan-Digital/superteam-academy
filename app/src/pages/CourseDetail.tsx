@@ -22,8 +22,9 @@ const CourseDetail = () => {
   const { enroll, status, txSignature, error, reset } = useEnrollCourse();
   const { connected } = useWallet();
   const { user } = useAuth();
+  const { completedLessonIds, isEnrolled, refetch: refetchProgress } = useCourseProgress(course?.id);
   const [enrolled, setEnrolled] = useState(false);
-  const { completedLessonIds, refetch: refetchProgress } = useCourseProgress(course?.id);
+  const isUserEnrolled = isEnrolled || enrolled;
 
   const handleEnroll = async () => {
     if (!course) return;
@@ -50,8 +51,8 @@ const CourseDetail = () => {
     return (
       <MainLayout>
         <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-          <p className="text-muted-foreground">{t('course.not_found')}</p>
-          <Link to="/courses" className="text-primary hover:underline mt-4 inline-block">{t('course.back_courses')}</Link>
+          <p className="text-muted-foreground">Course not found.</p>
+          <Link to="/courses" className="text-primary hover:underline mt-4 inline-block">Back to courses</Link>
         </div>
       </MainLayout>
     );
@@ -92,8 +93,8 @@ const CourseDetail = () => {
               {/* Progress */}
               <div className="mb-8 p-4 rounded-xl border border-border bg-card">
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">{t('course.progress')}</span>
-                  <span className="text-primary font-medium">{completedCount}/{totalLessons} {t('courses.lessons')}</span>
+                  <span className="text-muted-foreground">Progress</span>
+                  <span className="text-primary font-medium">{completedCount}/{totalLessons} lessons</span>
                 </div>
                 <div className="h-2 rounded-full bg-secondary overflow-hidden">
                   <motion.div
@@ -111,7 +112,7 @@ const CourseDetail = () => {
                   <div key={module.id} className="rounded-xl border border-border bg-card overflow-hidden">
                     <div className="px-5 py-4 border-b border-border bg-secondary/20">
                       <h3 className="font-semibold text-foreground">{module.title}</h3>
-                      <p className="text-xs text-muted-foreground mt-1">{module.lessons.length} {t('courses.lessons')}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{module.lessons.length} lessons</p>
                     </div>
                     <div className="divide-y divide-border">
                       {module.lessons.map((lesson) => {
@@ -154,7 +155,7 @@ const CourseDetail = () => {
                 className="mt-8"
               >
                 <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                  <Star className="w-4 h-4 text-accent" /> {t('course.reviews')}
+                  <Star className="w-4 h-4 text-accent" /> Student Reviews
                 </h3>
                 <div className="space-y-4">
                   {MOCK_REVIEWS.map((review, i) => (
@@ -195,11 +196,11 @@ const CourseDetail = () => {
               <div className="rounded-xl border border-border bg-card p-6 space-y-4">
                 <div className="text-center">
                   <div className="text-3xl font-display font-bold text-gradient mb-1">+{course.xpReward}</div>
-                  <p className="text-sm text-muted-foreground">{t('course.xp_completion')}</p>
+                  <p className="text-sm text-muted-foreground">XP upon completion</p>
                 </div>
 
                 <AnimatePresence mode="wait">
-                  {status === 'success' || enrolled ? (
+                  {status === 'success' || isUserEnrolled ? (
                     <motion.div
                       key="success"
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -208,7 +209,7 @@ const CourseDetail = () => {
                     >
                       <div className="p-3 rounded-lg bg-accent/10 border border-accent/20 text-center">
                         <CheckCircle2 className="w-5 h-5 text-accent mx-auto mb-1" />
-                        <p className="text-sm font-medium text-accent">{t('course.enrolled_success')}</p>
+                        <p className="text-sm font-medium text-accent">Enrolled!</p>
                         {txSignature && (
                           <a
                             href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
@@ -216,13 +217,13 @@ const CourseDetail = () => {
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline mt-1 font-mono"
                           >
-                            {t('course.view_explorer')} <ExternalLink className="w-3 h-3" />
+                            View on Explorer <ExternalLink className="w-3 h-3" />
                           </a>
                         )}
                       </div>
                       <Link to={`/courses/${slug}/lessons/${course.modules[0]?.lessons[0]?.id}`}>
                         <Button className="w-full bg-solana-gradient text-background hover:opacity-90 font-semibold">
-                          {t('courses.start_learning')}
+                          Start Learning
                         </Button>
                       </Link>
                     </motion.div>
@@ -238,7 +239,7 @@ const CourseDetail = () => {
                         <p className="text-xs text-destructive">{error}</p>
                       </div>
                       <Button onClick={() => { reset(); handleEnroll(); }} className="w-full bg-solana-gradient text-background hover:opacity-90 font-semibold">
-                        {t('course.try_again')}
+                        Try Again
                       </Button>
                     </motion.div>
                   ) : (
@@ -249,25 +250,25 @@ const CourseDetail = () => {
                         className="w-full bg-solana-gradient text-background hover:opacity-90 font-semibold h-11 gap-2"
                       >
                         {status === 'signing' ? (
-                          <><Loader2 className="w-4 h-4 animate-spin" /> {t('course.sign_wallet')}</>
+                          <><Loader2 className="w-4 h-4 animate-spin" /> Sign in Wallet...</>
                         ) : status === 'confirming' ? (
-                          <><Loader2 className="w-4 h-4 animate-spin" /> {t('course.confirming')}</>
+                          <><Loader2 className="w-4 h-4 animate-spin" /> Confirming...</>
                         ) : connected ? (
-                          <><Wallet className="w-4 h-4" /> {t('course.enroll_sign')}</>
+                          <><Wallet className="w-4 h-4" /> Enroll (Sign Transaction)</>
                         ) : user ? (
-                          <>{t('courses.enroll')}</>
+                          <>Enroll Now</>
                         ) : (
                           <>{t('courses.continue')}</>
                         )}
                       </Button>
                       {connected && (status === 'idle') && (
                         <p className="text-[10px] text-center text-muted-foreground">
-                          {t('course.memo_note')}
+                          Your wallet will sign a memo transaction on Devnet (no SOL cost)
                         </p>
                       )}
                       {!connected && user && (
                         <p className="text-[10px] text-center text-muted-foreground">
-                          {t('course.enroll_offchain')}
+                          Connect wallet for on-chain enrollment, or enroll off-chain
                         </p>
                       )}
                     </motion.div>
@@ -277,7 +278,7 @@ const CourseDetail = () => {
 
               {/* Instructor */}
               <div className="rounded-xl border border-border bg-card p-6">
-                <h4 className="text-sm font-semibold text-foreground mb-3">{t('course.instructor')}</h4>
+                <h4 className="text-sm font-semibold text-foreground mb-3">Instructor</h4>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-solana-gradient flex items-center justify-center text-background font-bold text-sm">
                     {course.instructor.name[0]}
@@ -291,7 +292,7 @@ const CourseDetail = () => {
 
               {/* Tags */}
               <div className="rounded-xl border border-border bg-card p-6">
-                <h4 className="text-sm font-semibold text-foreground mb-3">{t('course.topics')}</h4>
+                <h4 className="text-sm font-semibold text-foreground mb-3">Topics</h4>
                 <div className="flex flex-wrap gap-2">
                   {course.tags.map(tag => (
                     <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
